@@ -8,10 +8,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM
 
 # --- Streamlit Sayfa Ayarları ---
-st.set_page_config(
-    page_title="LSTM Hisse Senedi Tahmin Uygulaması",
-    layout="wide"
-)
+st.set_page_config(page_title="LSTM Hisse Senedi Tahmin Uygulaması", layout="wide")
 
 st.title("📈 LSTM ile Hisse Senedi Fiyatı Tahmini")
 st.markdown(
@@ -24,68 +21,78 @@ TICKER = st.sidebar.text_input("Hisse Senedi Sembolü (Örn: AAPL, THYAO)", "AAP
 LOOKBACK_DAYS = st.sidebar.slider("Girdi Olarak Kullanılacak Geçmiş Gün Sayısı (Zaman Adımı)", 30, 90, 60, 5)
 EPOCHS = st.sidebar.slider("Eğitim Epoch Sayısı", 1, 10, 3, 1)
 
+
 @st.cache_data
-def load_data(ticker: str) -> pd.DataFrame | None:
-    """Belirtilen sembol için yfinance'tan veriyi çeker ve sağlam hata kontrolü yapar."""
+def load_data(ticker: str):
+    """yfinance'tan veri çeker, BIST .IS ekler, MultiIndex/Close sorunlarını çözer."""
     if not ticker:
         st.warning("Lütfen bir hisse senedi sembolü girin.")
         return None
 
-    # BIST sembolü için otomatik .IS uzantısı ekleme kontrolü
+    # BIST için .IS otomatik ekle
     if 4 <= len(ticker) <= 5 and ticker.isalpha() and ticker.isupper() and "." not in ticker:
         ticker = f"{ticker}.IS"
         st.info(f"Sembol BIST olarak algılandı. '{ticker}' olarak güncellendi.")
 
     try:
-        # Daha stabil: period ile indir (son 2 yıl)
         data = yf.download(
             ticker,
             period="2y",
             interval="1d",
             auto_adjust=False,
+            group_by="column",   # kritik: kolon bazlı düzenleme
             progress=False,
             threads=True
         )
 
         if data is None or data.empty:
-            st.error(f"'{ticker}' için veri bulunamadı (data.empty). Sembolü kontrol edin.")
+            st.error(f"'{ticker}' için veri bulunamadı.")
             return None
 
-        # MultiIndex kolonlar gelebilir (bazı ticker/ortamlarda)
+        # MultiIndex kolonlar gelirse: hem level0 hem level1'de Close ara
         if isinstance(data.columns, pd.MultiIndex):
-            # örn: ('Close', 'AAPL') gibi
+
+            # Örn: ('Close', 'THYAO.IS')
             if "Close" in data.columns.get_level_values(0):
-                data = data["Close"]  # Series veya DF dönebilir
+                close_part = data["Close"]
+                if isinstance(close_part, pd.Series):
+                    data = close_part.to_frame("Close")
+                else:
+                    data = close_part.iloc[:, [0]]
+                    data.columns = ["Close"]
+
+            # Örn: ('THYAO.IS', 'Close')
+            elif "Close" in data.columns.get_level_values(1):
+                close_part = data.xs("Close", level=1, axis=1)
+                if isinstance(close_part, pd.Series):
+                    data = close_part.to_frame("Close")
+                else:
+                    data = close_part.iloc[:, [0]]
+                    data.columns = ["Close"]
+
             else:
-                st.error("Çekilen veride 'Close' alanı yok (MultiIndex).")
+                st.error("MultiIndex geldi ama 'Close' bulunamadı.")
                 st.write("Kolonlar:", data.columns)
                 return None
 
-        # Series geldiyse DataFrame'e çevir
-        if isinstance(data, pd.Series):
-            data = data.to_frame("Close")
+        else:
+            # Normal kolonlar
+            if "Close" not in data.columns:
+                st.error(f"'{ticker}' için çekilen veride 'Close' sütunu bulunamadı.")
+                st.write("Gelen kolonlar:", list(data.columns))
+                return None
+            data = data[["Close"]].copy()
 
-        # Close sütunu yoksa çık
-        if "Close" not in data.columns:
-            st.error(f"'{ticker}' için çekilen veride 'Close' sütunu bulunamadı.")
-            st.write("Gelen kolonlar:", list(data.columns))
-            return None
-
-        data = data[["Close"]].copy()
-
-        # Close komple NaN mı?
+        # Close tamamen NaN mı?
         if data["Close"].isna().all():
             st.error(
                 "Veri çekildi ancak 'Close' değerleri tamamen NaN geldi. "
-                "Sembol/ticker hatalı olabilir veya veri sağlayıcı geçici problem yaşıyor."
+                "Sembol/dönem hatalı olabilir veya yfinance veri sağlayıcısı sorun yaşıyor."
             )
-            st.write("Ham veri (son 10 satır):")
             st.dataframe(data.tail(10))
             return None
 
-        # Aradaki NaN satırlarını temizle
         data = data.dropna(subset=["Close"])
-
         if data.empty:
             st.error("NaN temizliği sonrası veri kalmadı.")
             return None
@@ -101,7 +108,6 @@ def train_and_predict(df: pd.DataFrame, lookback_days: int, epochs: int):
     """LSTM modelini eğitir ve tahminleri döndürür."""
     dataset = df[["Close"]].values  # garanti 2D
 
-    # Yeterli veri kontrolü
     if dataset.shape[0] < lookback_days + 1:
         st.error(
             f"Tahmin için yeterli veri yok. En az {lookback_days + 1} gün gerekir, "
@@ -109,27 +115,21 @@ def train_and_predict(df: pd.DataFrame, lookback_days: int, epochs: int):
         )
         return None, None, None
 
-    # %80 eğitim, %20 test ayrımı
     training_data_len = int(np.ceil(len(dataset) * 0.8))
 
-    # Normalizasyon
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaled_data = scaler.fit_transform(dataset)
 
-    train_data = scaled_data[0:training_data_len, :]
+    train_data = scaled_data[:training_data_len, :]
 
-    # LSTM için X ve Y oluşturma
     X_train, Y_train = [], []
     for i in range(lookback_days, len(train_data)):
         X_train.append(train_data[i - lookback_days:i, 0])
         Y_train.append(train_data[i, 0])
 
     X_train, Y_train = np.array(X_train), np.array(Y_train)
-
-    # 3D reshape
     X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
 
-    # Model
     model = Sequential()
     model.add(LSTM(50, return_sequences=True, input_shape=(X_train.shape[1], 1)))
     model.add(LSTM(50, return_sequences=False))
@@ -137,12 +137,10 @@ def train_and_predict(df: pd.DataFrame, lookback_days: int, epochs: int):
     model.add(Dense(1))
     model.compile(optimizer="adam", loss="mean_squared_error")
 
-    # Eğitim
     with st.spinner(f"Model {epochs} epoch boyunca eğitiliyor..."):
         model.fit(X_train, Y_train, batch_size=1, epochs=epochs, verbose=0)
     st.success("Eğitim tamamlandı!")
 
-    # Test seti
     test_data = scaled_data[training_data_len - lookback_days:, :]
     X_test = []
     Y_test = dataset[training_data_len:, :]  # orijinal ölçekte
@@ -156,9 +154,7 @@ def train_and_predict(df: pd.DataFrame, lookback_days: int, epochs: int):
     predictions = model.predict(X_test, verbose=0)
     predictions = scaler.inverse_transform(predictions)
 
-    # RMSE
     rmse = np.sqrt(np.mean((predictions - Y_test) ** 2))
-
     return predictions, rmse, training_data_len
 
 
@@ -181,7 +177,6 @@ if st.sidebar.button("Analizi Başlat"):
 
         st.subheader("Model Performansı")
         st.metric("Kök Ortalama Kare Hatası (RMSE)", f"{rmse:.2f}")
-        st.info("RMSE düşükse tahminler genelde daha yakındır (tek başına yeterli metrik değildir).")
 
         st.subheader(f"{TICKER} Fiyat Tahmini Grafiği")
         fig = plt.figure(figsize=(16, 8))
