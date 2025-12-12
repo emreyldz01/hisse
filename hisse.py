@@ -36,9 +36,10 @@ def load_data(ticker):
         st.info(f"Sembol BIST olarak algılandı. '{ticker}' olarak güncelleniyor.")
         
     try:
-        # Veri çekme (yfinance)
+        # Veri çekme (yfinance). Tarih aralığı güncel ve temiz veriye odaklandı.
         data = yf.download(ticker, start="2018-01-01", end="2024-12-31")
-            if data.empty:
+        
+        if data.empty:
             st.error(f"'{ticker}' sembolü için **veritabanında hiç veri bulunamadı**.")
             return None
         
@@ -83,6 +84,7 @@ def train_and_predict(df, lookback_days, epochs):
     training_data_len = int(np.ceil(len(dataset) * 0.8)) 
 
     # 1. Veri Ön İşleme (Normalizasyon)
+    # 
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaled_data = scaler.fit_transform(dataset)
     
@@ -177,7 +179,6 @@ if st.sidebar.button("Analizi Başlat"):
 
 # --- Uygulama Talimatı ---
 st.sidebar.markdown("---")
-st.sidebar.markdown("**UYGULAMA TALİMATI**")
-st.sidebar.code("streamlit run app.py")
-st.sidebar.markdown("*Tüm kütüphaneleriniz kurulu olmalıdır.*")
-
+st.sidebar.markdown("**PROJE TAMAMLANDI!**")
+st.sidebar.markdown("Bu kodu GitHub'a yükleyip Streamlit Cloud üzerinden yayınlayabilirsiniz.")
+st.sidebar.markdown("Yayınlama adımları için bana **'yayınlama'** yazmanız yeterlidir.")
