@@ -37,8 +37,7 @@ def load_data(ticker):
         
     try:
         # Veri çekme (yfinance). Tarih aralığı güncel ve temiz veriye odaklandı.
-        data = yf.download(ticker, start="2018-01-01", end="2024-12-31")
-        
+        data = yf.download(ticker, start="2022-01-01", end="2024-12-31") # 2022'den itibaren deneyin
         if data.empty:
             st.error(f"'{ticker}' sembolü için **veritabanında hiç veri bulunamadı**.")
             return None
@@ -182,3 +181,4 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("**PROJE TAMAMLANDI!**")
 st.sidebar.markdown("Bu kodu GitHub'a yükleyip Streamlit Cloud üzerinden yayınlayabilirsiniz.")
 st.sidebar.markdown("Yayınlama adımları için bana **'yayınlama'** yazmanız yeterlidir.")
+
