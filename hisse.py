@@ -37,9 +37,8 @@ def load_data(ticker):
         
     try:
         # Veri çekme (yfinance)
-        data = yf.download(ticker, start="2015-01-01", end="2023-01-01")
-        
-        if data.empty:
+        data = yf.download(ticker, start="2018-01-01", end="2024-12-31")
+            if data.empty:
             st.error(f"'{ticker}' sembolü için **veritabanında hiç veri bulunamadı**.")
             return None
         
@@ -181,3 +180,4 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("**UYGULAMA TALİMATI**")
 st.sidebar.code("streamlit run app.py")
 st.sidebar.markdown("*Tüm kütüphaneleriniz kurulu olmalıdır.*")
+
