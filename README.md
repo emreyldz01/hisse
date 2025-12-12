@@ -1,0 +1,2 @@
+# hisse
+hesaplama ai
