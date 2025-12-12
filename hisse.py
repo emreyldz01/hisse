@@ -12,16 +12,31 @@ st.set_page_config(page_title="LSTM Hisse Senedi Tahmin Uygulaması", layout="wi
 
 st.title("📈 LSTM ile Hisse Senedi Fiyatı Tahmini")
 st.markdown(
-    "Seçtiğiniz hisse senedinin geçmiş verilerini kullanarak bir **LSTM (Uzun-Kısa Süreli Bellek)** modeli eğitir ve fiyat tahminini görselleştirir."
+    "Seçtiğiniz hisse senedinin geçmiş verilerini kullanarak bir **LSTM (Uzun-Kısa Süreli Bellek)** modeli eğitir ve "
+    "**AL/SAT indikatörleri** ile sinyal üretir."
 )
 
-# --- Kullanıcıdan Giriş Alma ---
+# --- Sidebar Ayarları ---
 st.sidebar.header("Ayarlar")
 TICKER = st.sidebar.text_input("Hisse Senedi Sembolü (Örn: AAPL, THYAO)", "AAPL").upper()
 LOOKBACK_DAYS = st.sidebar.slider("Girdi Olarak Kullanılacak Geçmiş Gün Sayısı (Zaman Adımı)", 30, 90, 60, 5)
 EPOCHS = st.sidebar.slider("Eğitim Epoch Sayısı", 1, 10, 3, 1)
 
+st.sidebar.markdown("---")
+st.sidebar.subheader("📌 AL/SAT İndikatörü")
+SIGNAL_STRATEGY = st.sidebar.selectbox("Strateji Seç", ["SMA Kesişimi", "RSI", "MACD"])
 
+SMA_FAST = st.sidebar.slider("SMA Kısa", 5, 50, 10)
+SMA_SLOW = st.sidebar.slider("SMA Uzun", 20, 200, 50)
+
+RSI_PERIOD = st.sidebar.slider("RSI Periyot", 7, 30, 14)
+RSI_BUY = st.sidebar.slider("RSI AL Eşiği", 10, 40, 30)
+RSI_SELL = st.sidebar.slider("RSI SAT Eşiği", 60, 90, 70)
+
+SHOW_SIGNALS = st.sidebar.checkbox("Grafikte AL/SAT işaretlerini göster", True)
+
+
+# --- Veri Çekme ---
 @st.cache_data
 def load_data(ticker: str):
     """yfinance'tan veri çeker, BIST .IS ekler, MultiIndex/Close sorunlarını çözer."""
@@ -104,8 +119,93 @@ def load_data(ticker: str):
         return None
 
 
+# --- AL/SAT İndikatörleri ---
+def compute_rsi(series: pd.Series, period: int = 14) -> pd.Series:
+    delta = series.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+
+    avg_gain = gain.rolling(period).mean()
+    avg_loss = loss.rolling(period).mean()
+
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+
+def add_trade_signals(
+    df: pd.DataFrame,
+    strategy: str,
+    sma_fast: int,
+    sma_slow: int,
+    rsi_period: int,
+    rsi_buy: int,
+    rsi_sell: int
+) -> pd.DataFrame:
+    out = df.copy()
+    close = out["Close"]
+
+    out["BuySignal"] = np.nan
+    out["SellSignal"] = np.nan
+    out["Signal"] = "BEKLE"
+
+    if strategy == "SMA Kesişimi":
+        out["SMA_FAST"] = close.rolling(sma_fast).mean()
+        out["SMA_SLOW"] = close.rolling(sma_slow).mean()
+
+        sig = (out["SMA_FAST"] > out["SMA_SLOW"]).astype(int)
+        cross = sig.diff()
+
+        buy_idx = cross[cross == 1].index
+        sell_idx = cross[cross == -1].index
+
+        out.loc[buy_idx, "BuySignal"] = out.loc[buy_idx, "Close"]
+        out.loc[sell_idx, "SellSignal"] = out.loc[sell_idx, "Close"]
+
+        if len(sig.dropna()) > 0:
+            out.loc[out.index[-1], "Signal"] = "AL" if sig.iloc[-1] == 1 else "SAT"
+
+    elif strategy == "RSI":
+        out["RSI"] = compute_rsi(close, rsi_period)
+
+        buy_idx = out.index[out["RSI"] < rsi_buy]
+        sell_idx = out.index[out["RSI"] > rsi_sell]
+
+        out.loc[buy_idx, "BuySignal"] = out.loc[buy_idx, "Close"]
+        out.loc[sell_idx, "SellSignal"] = out.loc[sell_idx, "Close"]
+
+        last_rsi = out["RSI"].iloc[-1]
+        if pd.notna(last_rsi):
+            if last_rsi < rsi_buy:
+                out.loc[out.index[-1], "Signal"] = "AL"
+            elif last_rsi > rsi_sell:
+                out.loc[out.index[-1], "Signal"] = "SAT"
+            else:
+                out.loc[out.index[-1], "Signal"] = "BEKLE"
+
+    elif strategy == "MACD":
+        ema12 = close.ewm(span=12, adjust=False).mean()
+        ema26 = close.ewm(span=26, adjust=False).mean()
+        out["MACD"] = ema12 - ema26
+        out["MACD_SIGNAL"] = out["MACD"].ewm(span=9, adjust=False).mean()
+
+        sig = (out["MACD"] > out["MACD_SIGNAL"]).astype(int)
+        cross = sig.diff()
+
+        buy_idx = cross[cross == 1].index
+        sell_idx = cross[cross == -1].index
+
+        out.loc[buy_idx, "BuySignal"] = out.loc[buy_idx, "Close"]
+        out.loc[sell_idx, "SellSignal"] = out.loc[sell_idx, "Close"]
+
+        if len(sig.dropna()) > 0:
+            out.loc[out.index[-1], "Signal"] = "AL" if sig.iloc[-1] == 1 else "SAT"
+
+    return out
+
+
+# --- LSTM Model ---
 def train_and_predict(df: pd.DataFrame, lookback_days: int, epochs: int):
-    """LSTM modelini eğitir ve tahminleri döndürür."""
     dataset = df[["Close"]].values  # garanti 2D
 
     if dataset.shape[0] < lookback_days + 1:
@@ -143,7 +243,7 @@ def train_and_predict(df: pd.DataFrame, lookback_days: int, epochs: int):
 
     test_data = scaled_data[training_data_len - lookback_days:, :]
     X_test = []
-    Y_test = dataset[training_data_len:, :]  # orijinal ölçekte
+    Y_test = dataset[training_data_len:, :]
 
     for i in range(lookback_days, len(test_data)):
         X_test.append(test_data[i - lookback_days:i, 0])
@@ -162,35 +262,78 @@ def train_and_predict(df: pd.DataFrame, lookback_days: int, epochs: int):
 if st.sidebar.button("Analizi Başlat"):
     df = load_data(TICKER)
 
-    if df is not None:
-        st.subheader(f"📊 {TICKER} Hisse Senedi Verisi (Son 5 Gün)")
-        st.dataframe(df.tail())
+    if df is None:
+        st.stop()
 
-        predictions, rmse, training_data_len = train_and_predict(df, LOOKBACK_DAYS, EPOCHS)
+    st.subheader(f"📊 {TICKER} Hisse Senedi Verisi (Son 5 Gün)")
+    st.dataframe(df.tail())
 
-        if predictions is None:
-            st.stop()
+    # --- AL/SAT Sinyalleri ---
+    df_sig = add_trade_signals(
+        df,
+        strategy=SIGNAL_STRATEGY,
+        sma_fast=SMA_FAST,
+        sma_slow=SMA_SLOW,
+        rsi_period=RSI_PERIOD,
+        rsi_buy=RSI_BUY,
+        rsi_sell=RSI_SELL
+    )
 
-        train = df[:training_data_len]
-        valid = df[training_data_len:].copy()
-        valid["Predictions"] = predictions
+    st.subheader("🟢🔴 AL/SAT İndikatörü Sonucu")
+    st.metric("Son Sinyal", df_sig["Signal"].iloc[-1])
 
-        st.subheader("Model Performansı")
-        st.metric("Kök Ortalama Kare Hatası (RMSE)", f"{rmse:.2f}")
+    st.subheader("📉 İndikatör Grafiği")
+    fig2 = plt.figure(figsize=(16, 6))
+    plt.title(f"{TICKER} - {SIGNAL_STRATEGY}")
+    plt.xlabel("Tarih")
+    plt.ylabel("Fiyat")
+    plt.plot(df_sig["Close"], label="Close")
 
-        st.subheader(f"{TICKER} Fiyat Tahmini Grafiği")
-        fig = plt.figure(figsize=(16, 8))
-        plt.title(f"{TICKER} Kapanış Fiyatı Tahmini (LSTM)")
-        plt.xlabel("Tarih", fontsize=14)
-        plt.ylabel("Kapanış Fiyatı", fontsize=14)
-        plt.plot(train["Close"], label="Eğitim Verisi")
-        plt.plot(valid["Close"], label="Gerçek Değerler")
-        plt.plot(valid["Predictions"], label="Tahminler")
-        plt.legend(loc="lower right")
-        st.pyplot(fig)
+    if "SMA_FAST" in df_sig.columns:
+        plt.plot(df_sig["SMA_FAST"], label=f"SMA {SMA_FAST}")
+    if "SMA_SLOW" in df_sig.columns:
+        plt.plot(df_sig["SMA_SLOW"], label=f"SMA {SMA_SLOW}")
 
-        st.subheader("Gerçek vs. Tahmin Edilen Değerler (Son 10 Gün)")
-        st.dataframe(valid.tail(10))
+    if SHOW_SIGNALS:
+        buys = df_sig["BuySignal"].dropna()
+        sells = df_sig["SellSignal"].dropna()
+        plt.scatter(buys.index, buys.values, label="AL", marker="^")
+        plt.scatter(sells.index, sells.values, label="SAT", marker="v")
+
+    plt.legend()
+    st.pyplot(fig2)
+
+    st.subheader("📄 Sinyal Tablosu (Son 15 gün)")
+    cols_to_show = [c for c in ["Close", "Signal", "SMA_FAST", "SMA_SLOW", "RSI", "MACD", "MACD_SIGNAL"] if c in df_sig.columns]
+    st.dataframe(df_sig[cols_to_show].tail(15))
+
+    st.markdown("---")
+
+    # --- LSTM Eğitimi ve Tahmin ---
+    predictions, rmse, training_data_len = train_and_predict(df, LOOKBACK_DAYS, EPOCHS)
+    if predictions is None:
+        st.stop()
+
+    train = df[:training_data_len]
+    valid = df[training_data_len:].copy()
+    valid["Predictions"] = predictions
+
+    st.subheader("📌 LSTM Model Performansı")
+    st.metric("RMSE", f"{rmse:.2f}")
+
+    st.subheader(f"📈 {TICKER} Fiyat Tahmini Grafiği (LSTM)")
+    fig = plt.figure(figsize=(16, 8))
+    plt.title(f"{TICKER} Kapanış Fiyatı Tahmini (LSTM)")
+    plt.xlabel("Tarih", fontsize=14)
+    plt.ylabel("Kapanış Fiyatı", fontsize=14)
+    plt.plot(train["Close"], label="Eğitim Verisi")
+    plt.plot(valid["Close"], label="Gerçek Değerler")
+    plt.plot(valid["Predictions"], label="Tahminler")
+    plt.legend(loc="lower right")
+    st.pyplot(fig)
+
+    st.subheader("📄 Gerçek vs. Tahmin Edilen Değerler (Son 10 Gün)")
+    st.dataframe(valid.tail(10))
 
 # --- Uygulama Talimatı ---
 st.sidebar.markdown("---")
