@@ -18,7 +18,7 @@ st.markdown("Seçtiğiniz hisse senedinin geçmiş verilerini kullanarak bir **L
 
 # --- Kullanıcıdan Giriş Alma ---
 st.sidebar.header("Ayarlar")
-TICKER = st.sidebar.text_input("Hisse Senedi Sembolü (Örn: AAPL, MSFT, THYAO)", 'AAPL').upper()
+TICKER = st.sidebar.text_input("Hisse Senedi Sembolü (Örn: AAPL, THYAO)", 'AAPL').upper()
 LOOKBACK_DAYS = st.sidebar.slider("Girdi Olarak Kullanılacak Geçmiş Gün Sayısı (Zaman Adımı)", 30, 90, 60, 5)
 EPOCHS = st.sidebar.slider("Eğitim Epoch Sayısı", 1, 10, 3, 1)
 
@@ -36,6 +36,7 @@ def load_data(ticker):
         st.info(f"Sembol BIST olarak algılandı. '{ticker}' olarak güncelleniyor.")
         
     try:
+        # Veri çekme (yfinance)
         data = yf.download(ticker, start="2015-01-01", end="2023-01-01")
         
         if data.empty:
@@ -44,15 +45,18 @@ def load_data(ticker):
         
         # Sütun Kontrolü: 'Close' sütunu var mı?
         if 'Close' not in data.columns:
-            st.error(f"'{ticker}' sembolü için çekilen verilerde **'Close' (Kapanış) sütunu bulunamadı**. Lütfen sembolü tekrar kontrol edin.")
+            st.error(f"'{ticker}' sembolü için çekilen verilerde **'Close' (Kapanış) sütunu bulunamadı**. Veri yapısını kontrol edin.")
             return None
         
         # Sadece Kapanış sütununu alıyoruz
         data = data.filter(['Close'])
         
-        # NaN kontrolü: Kapanış sütunu tamamen boş mu?
-        if data['Close'].isnull().all():
-            st.error(f"'{ticker}' sembolü için çekilen verilerdeki 'Close' sütunu tamamen boş (NaN) değerler içeriyor.")
+        # GÜÇLENDİRME: NaN Değerleri Atma
+        data = data.dropna() 
+        
+        # Temizledikten sonra veri kaldı mı kontrolü
+        if data.empty:
+            st.error(f"Veri çekildi, ancak tüm 'Close' değerleri eksik (NaN) olduğu için analiz edilemiyor. Lütfen farklı bir tarih aralığı deneyin.")
             return None
             
         return data
@@ -121,6 +125,7 @@ def train_and_predict(df, lookback_days, epochs):
     X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
 
     predictions = model.predict(X_test, verbose=0)
+    # Tahminleri orijinal ölçeğe geri çevirme
     predictions = scaler.inverse_transform(predictions) 
 
     # Performans Ölçümü (RMSE)
