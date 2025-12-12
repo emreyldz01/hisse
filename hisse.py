@@ -16,10 +16,6 @@ st.set_page_config(
 st.title("📈 LSTM ile Hisse Senedi Fiyatı Tahmini")
 st.markdown("Seçtiğiniz hisse senedinin geçmiş verilerini kullanarak bir **LSTM (Uzun-Kısa Süreli Bellek)** modeli eğitir ve fiyat tahminini görselleştirir.")
 
-
-[Image of LSTM network diagram]
-
-
 # --- Kullanıcıdan Giriş Alma ---
 st.sidebar.header("Ayarlar")
 TICKER = st.sidebar.text_input("Hisse Senedi Sembolü (Örn: AAPL, MSFT, THYAO)", 'AAPL').upper()
@@ -35,13 +31,11 @@ def load_data(ticker):
         return None
     
     # BIST sembolü için otomatik .IS uzantısı ekleme kontrolü
-    # 4-5 harfli büyük harf ve uzantısı yoksa BIST varsayımı
     if 4 <= len(ticker) <= 5 and ticker.isalpha() and ticker.isupper() and not '.' in ticker:
         ticker = f"{ticker}.IS"
         st.info(f"Sembol BIST olarak algılandı. '{ticker}' olarak güncelleniyor.")
         
     try:
-        # Veri çekme
         data = yf.download(ticker, start="2015-01-01", end="2023-01-01")
         
         if data.empty:
@@ -86,7 +80,6 @@ def train_and_predict(df, lookback_days, epochs):
     training_data_len = int(np.ceil(len(dataset) * 0.8)) 
 
     # 1. Veri Ön İşleme (Normalizasyon)
-    # Veriyi 0 ile 1 arasına ölçeklendiriyoruz
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaled_data = scaler.fit_transform(dataset)
     
@@ -95,9 +88,7 @@ def train_and_predict(df, lookback_days, epochs):
     # Veri yapılandırma (LSTM için X ve Y oluşturma)
     X_train, Y_train = [], []
     for i in range(lookback_days, len(train_data)):
-        # Geçmiş lookback_days gününü X (girdi) olarak al
         X_train.append(train_data[i-lookback_days:i, 0])
-        # Bir sonraki günü Y (çıktı/hedef) olarak al
         Y_train.append(train_data[i, 0])
     
     X_train, Y_train = np.array(X_train), np.array(Y_train)
@@ -130,7 +121,6 @@ def train_and_predict(df, lookback_days, epochs):
     X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
 
     predictions = model.predict(X_test, verbose=0)
-    # Tahminleri orijinal ölçeğe geri çevirme
     predictions = scaler.inverse_transform(predictions) 
 
     # Performans Ölçümü (RMSE)
@@ -160,7 +150,6 @@ if st.sidebar.button("Analizi Başlat"):
         train = df.filter(['Close'])[:training_data_len]
         valid = df.filter(['Close'])[training_data_len:]
         
-        # Tahminleri geçerli (test) veri setine ekleme
         valid = valid.assign(Predictions=predictions)
 
         st.subheader("Model Performansı")
@@ -169,7 +158,6 @@ if st.sidebar.button("Analizi Başlat"):
         
         st.subheader(f"{TICKER} Fiyat Tahmini Grafiği")
         
-        # Matplotlib figürü oluşturma
         fig = plt.figure(figsize=(16, 8))
         plt.title(f'{TICKER} Kapanış Fiyatı Tahmini (LSTM)')
         plt.xlabel('Tarih', fontsize=18)
@@ -178,7 +166,7 @@ if st.sidebar.button("Analizi Başlat"):
         plt.plot(valid['Close'], label='Gerçek Değerler', color='red')
         plt.plot(valid['Predictions'], label='Tahminler', color='green')
         plt.legend(loc='lower right')
-        st.pyplot(fig) # Streamlit ile figürü gösterme
+        st.pyplot(fig)
         
         st.subheader("Gerçek vs. Tahmin Edilen Değerler (Son 10 Gün)")
         st.dataframe(valid.tail(10))
