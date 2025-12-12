@@ -14,40 +14,58 @@ st.set_page_config(
 )
 
 st.title("📈 LSTM ile Hisse Senedi Fiyatı Tahmini")
-st.markdown("Seçtiğiniz hisse senedinin geçmiş verilerini kullanarak bir LSTM modeli eğitir ve fiyat tahminini görselleştirir.")
+st.markdown("Seçtiğiniz hisse senedinin geçmiş verilerini kullanarak bir **LSTM (Uzun-Kısa Süreli Bellek)** modeli eğitir ve fiyat tahminini görselleştirir.")
+
+
+[Image of LSTM network diagram]
+
 
 # --- Kullanıcıdan Giriş Alma ---
 st.sidebar.header("Ayarlar")
-TICKER = st.sidebar.text_input("Hisse Senedi Sembolü (Örn: AAPL, MSFT, THYAO.IS)", 'AAPL').upper()
+TICKER = st.sidebar.text_input("Hisse Senedi Sembolü (Örn: AAPL, MSFT, THYAO)", 'AAPL').upper()
 LOOKBACK_DAYS = st.sidebar.slider("Girdi Olarak Kullanılacak Geçmiş Gün Sayısı (Zaman Adımı)", 30, 90, 60, 5)
 EPOCHS = st.sidebar.slider("Eğitim Epoch Sayısı", 1, 10, 3, 1)
 
-# Veriyi önbelleğe alma (uygulama her yenilendiğinde tekrar indirmemek için)
+# Veriyi önbelleğe alma
 @st.cache_data
 def load_data(ticker):
     """Belirtilen sembol için yfinance'tan veriyi çeker ve hata kontrolü yapar."""
     if not ticker:
         st.warning("Lütfen bir hisse senedi sembolü girin.")
         return None
+    
+    # BIST sembolü için otomatik .IS uzantısı ekleme kontrolü
+    # 4-5 harfli büyük harf ve uzantısı yoksa BIST varsayımı
+    if 4 <= len(ticker) <= 5 and ticker.isalpha() and ticker.isupper() and not '.' in ticker:
+        ticker = f"{ticker}.IS"
+        st.info(f"Sembol BIST olarak algılandı. '{ticker}' olarak güncelleniyor.")
         
     try:
+        # Veri çekme
         data = yf.download(ticker, start="2015-01-01", end="2023-01-01")
         
         if data.empty:
             st.error(f"'{ticker}' sembolü için **veritabanında hiç veri bulunamadı**.")
             return None
         
+        # Sütun Kontrolü: 'Close' sütunu var mı?
+        if 'Close' not in data.columns:
+            st.error(f"'{ticker}' sembolü için çekilen verilerde **'Close' (Kapanış) sütunu bulunamadı**. Lütfen sembolü tekrar kontrol edin.")
+            return None
+        
         # Sadece Kapanış sütununu alıyoruz
         data = data.filter(['Close'])
         
+        # NaN kontrolü: Kapanış sütunu tamamen boş mu?
         if data['Close'].isnull().all():
-            st.error(f"'{ticker}' sembolü için çekilen verilerde **Kapanış fiyatı eksik** veya tamamen boş.")
+            st.error(f"'{ticker}' sembolü için çekilen verilerdeki 'Close' sütunu tamamen boş (NaN) değerler içeriyor.")
             return None
             
         return data
         
     except Exception as e:
-        st.error(f"Veri çekme hatası (Sembolü kontrol edin): {e}")
+        # Genel çekim hatası
+        st.error(f"Veri çekme sırasında beklenmeyen bir hata oluştu. Sembolü kontrol edin: {e}")
         return None
 
 # Model eğitimi ve tahmin fonksiyonu
@@ -55,7 +73,7 @@ def train_and_predict(df, lookback_days, epochs):
     """LSTM modelini eğitir ve tahminleri döndürür."""
     dataset = df.values
     
-    # Veri boyut kontrolü (önceki hatayı önler)
+    # Veri boyut kontrolü: 1D'den 2D'ye çevirme
     if dataset.ndim == 1:
         dataset = dataset.reshape(-1, 1)
         
@@ -64,10 +82,11 @@ def train_and_predict(df, lookback_days, epochs):
         st.error(f"Tahmin için yeterli veri yok. En az {lookback_days + 1} gün gereklidir, ancak {dataset.shape[0]} gün bulundu.")
         return None, None, None
 
-    # %80 eğitim, %20 test
+    # %80 eğitim, %20 test ayrımı
     training_data_len = int(np.ceil(len(dataset) * 0.8)) 
 
     # 1. Veri Ön İşleme (Normalizasyon)
+    # Veriyi 0 ile 1 arasına ölçeklendiriyoruz
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaled_data = scaler.fit_transform(dataset)
     
@@ -76,7 +95,9 @@ def train_and_predict(df, lookback_days, epochs):
     # Veri yapılandırma (LSTM için X ve Y oluşturma)
     X_train, Y_train = [], []
     for i in range(lookback_days, len(train_data)):
+        # Geçmiş lookback_days gününü X (girdi) olarak al
         X_train.append(train_data[i-lookback_days:i, 0])
+        # Bir sonraki günü Y (çıktı/hedef) olarak al
         Y_train.append(train_data[i, 0])
     
     X_train, Y_train = np.array(X_train), np.array(Y_train)
@@ -94,15 +115,12 @@ def train_and_predict(df, lookback_days, epochs):
 
     # 3. Model Eğitimi
     with st.spinner(f"Model {epochs} epoch boyunca eğitiliyor... Bu biraz zaman alabilir."):
-        # verbose=0 ile eğitim çıktısını Streamlit'te göstermeyi kapatıyoruz
         model.fit(X_train, Y_train, batch_size=1, epochs=epochs, verbose=0)
     st.success("Eğitim Tamamlandı!")
     
     # 4. Tahmin
-    # Test verisi için, son 'lookback_days' gününü de dahil etmeliyiz.
     test_data = scaled_data[training_data_len - lookback_days:, :]
     X_test = []
-    # Y_test, gerçek (ölçeklendirilmemiş) değerlerdir
     Y_test = dataset[training_data_len:, :]
     
     for i in range(lookback_days, len(test_data)):
@@ -120,6 +138,7 @@ def train_and_predict(df, lookback_days, epochs):
     
     return predictions, rmse, training_data_len
 
+# --- Uygulama Akışı ---
 if st.sidebar.button("Analizi Başlat"):
     
     df = load_data(TICKER)
@@ -133,7 +152,7 @@ if st.sidebar.button("Analizi Başlat"):
         # Model Eğitimi ve Tahmin
         predictions, rmse, training_data_len = train_and_predict(df, LOOKBACK_DAYS, EPOCHS)
         
-        # Hata durumunda (None) çıkış yap
+        # Model hatası durumunda çıkış yap
         if predictions is None:
             st.stop()
             
@@ -164,8 +183,8 @@ if st.sidebar.button("Analizi Başlat"):
         st.subheader("Gerçek vs. Tahmin Edilen Değerler (Son 10 Gün)")
         st.dataframe(valid.tail(10))
 
-# --- Uygulamayı Çalıştırma Talimatı ---
+# --- Uygulama Talimatı ---
 st.sidebar.markdown("---")
 st.sidebar.markdown("**UYGULAMA TALİMATI**")
 st.sidebar.code("streamlit run app.py")
-st.sidebar.markdown("Başlatmadan önce tüm kütüphanelerin `requirements.txt` dosyasında olduğundan emin olun.")
+st.sidebar.markdown("*Tüm kütüphaneleriniz kurulu olmalıdır.*")
