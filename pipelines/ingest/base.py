@@ -54,6 +54,9 @@ class BaseCollector(ABC):
         self.rate_limiter = RateLimiter(per_minute=rate_limit_per_minute, burst=burst)
         self.session = requests.Session()
 
+    def _is_placeholder_url(self) -> bool:
+        return not self.base_url or "example.com" in self.base_url
+
     def _headers(self) -> Dict[str, str]:
         headers = {"User-Agent": "hisse-ingest/1.0"}
         if self.api_key:
@@ -61,9 +64,20 @@ class BaseCollector(ABC):
         return headers
 
     def collect(self) -> List[Document]:
+        if self._is_placeholder_url():
+            logger.warning("Skipping %s collector because base_url is not configured", self.name)
+            return []
+
         self.rate_limiter.wait()
         logger.info("Collecting data from %s", self.name)
-        return list(self._fetch())
+        try:
+            return list(self._fetch())
+        except requests.RequestException as exc:
+            logger.error("Network error while collecting %s: %s", self.name, exc)
+            return []
+        except Exception:
+            logger.exception("Unexpected error while collecting %s", self.name)
+            return []
 
     @abstractmethod
     def _fetch(self) -> Iterable[Document]:
