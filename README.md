@@ -30,14 +30,3 @@ python -m pipelines.run_ingest
 ### Dil tespiti, çeviri ve normalizasyon
 
 `pipelines/processing/text_processing.py` dil tespiti (`langdetect`), Marian MT tabanlı açık kaynak çeviri, metin normalizasyonu, deduplikasyon ve basit spam filtresi uygulayarak kuyrukta yalnızca temiz içerik kalmasını sağlar.
-
-## Kurulum Notları
-
-- **Tam Streamlit uygulaması** için Python 3.11 kullanın. TensorFlow 3.12 üzerinde wheel sağlamadığı için `pip install -r requirements.txt` 3.12+ ortamlarında TensorFlow'u otomatik atlar; bu durumda Streamlit uygulaması çalışmaz.
-- **Sadece ingest pipeline** çalıştırmak istiyorsanız TensorFlow/Streamlit'e gerek yoktur. Hafif kurulum:
-  ```bash
-  python -m venv .venv && source .venv/bin/activate
-  pip install --upgrade pip
-  pip install -r requirements-pipeline.txt
-  python -m pipelines.run_ingest
-  ```
