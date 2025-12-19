@@ -12,6 +12,24 @@ logger = logging.getLogger(__name__)
 class PriceCollector(BaseCollector):
     """Collect price candles or ticks from a market data API."""
 
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        rate_limit_per_minute: int = 60,
+        burst: int | None = None,
+        params: dict | None = None,
+    ):
+        default_params = {"symbol": "BTCUSD", "interval": "1m", "limit": 50}
+        merged_params = {**default_params, **(params or {})}
+        super().__init__(
+            "prices",
+            api_key,
+            base_url,
+            rate_limit_per_minute=rate_limit_per_minute,
+            burst=burst,
+            params=merged_params,
+        )
     def __init__(self, api_key: str, base_url: str, rate_limit_per_minute: int = 60, params: dict | None = None):
         default_params = {"symbol": "BTCUSD", "interval": "1m", "limit": 50}
         merged_params = {**default_params, **(params or {})}

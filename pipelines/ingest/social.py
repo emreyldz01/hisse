@@ -12,6 +12,25 @@ logger = logging.getLogger(__name__)
 class SocialCollector(BaseCollector):
     """Fetch short-form social content (tweets/posts) via an API."""
 
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        rate_limit_per_minute: int = 300,
+        burst: int | None = None,
+        params: dict | None = None,
+    ):
+        default_params = {"limit": 50, "order": "desc"}
+        merged_params = {**default_params, **(params or {})}
+        super().__init__(
+            "social",
+            api_key,
+            base_url,
+            rate_limit_per_minute=rate_limit_per_minute,
+            burst=burst,
+            params=merged_params,
+        )
+=======
     def __init__(self, api_key: str, base_url: str, rate_limit_per_minute: int = 300, params: dict | None = None):
         default_params = {"limit": 50, "order": "desc"}
         merged_params = {**default_params, **(params or {})}

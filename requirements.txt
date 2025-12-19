@@ -3,7 +3,6 @@ pandas
 numpy
 matplotlib
 scikit-learn
-streamlit
 pandas
 numpy
 matplotlib
@@ -16,4 +15,3 @@ prefect
 langdetect
 transformers
 sentencepiece
-

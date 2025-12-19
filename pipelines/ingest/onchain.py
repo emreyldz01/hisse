@@ -12,6 +12,25 @@ logger = logging.getLogger(__name__)
 class OnChainCollector(BaseCollector):
     """Collect on-chain metrics such as transfers or gas usage."""
 
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        rate_limit_per_minute: int = 120,
+        burst: int | None = None,
+        params: dict | None = None,
+    ):
+        default_params = {"window": "1h"}
+        merged_params = {**default_params, **(params or {})}
+        super().__init__(
+            "onchain",
+            api_key,
+            base_url,
+            rate_limit_per_minute=rate_limit_per_minute,
+            burst=burst,
+            params=merged_params,
+        )
+=======
     def __init__(self, api_key: str, base_url: str, rate_limit_per_minute: int = 120, params: dict | None = None):
         default_params = {"window": "1h"}
         merged_params = {**default_params, **(params or {})}

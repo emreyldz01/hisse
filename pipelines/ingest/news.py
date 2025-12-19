@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 class NewsCollector(BaseCollector):
     """Ingest headlines from a configurable news API."""
 
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        rate_limit_per_minute: int = 60,
+        burst: int | None = None,
+        params: dict | None = None,
+    ):
     def __init__(self, api_key: str, base_url: str, rate_limit_per_minute: int = 60, params: dict | None = None):
         default_params = {
             "language": "tr,en",
@@ -20,6 +28,14 @@ class NewsCollector(BaseCollector):
             "from": (datetime.utcnow() - timedelta(hours=6)).isoformat(timespec="seconds") + "Z",
         }
         merged_params = {**default_params, **(params or {})}
+        super().__init__(
+            "news",
+            api_key,
+            base_url,
+            rate_limit_per_minute=rate_limit_per_minute,
+            burst=burst,
+            params=merged_params,
+        )
         super().__init__("news", api_key, base_url, rate_limit_per_minute, params=merged_params)
 
     def _fetch(self) -> Iterable[Document]:
