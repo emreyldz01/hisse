@@ -4,6 +4,7 @@ import hashlib
 import logging
 import re
 import unicodedata
+from importlib.util import find_spec
 from typing import Iterable, List, Optional, Sequence
 
 from langdetect import DetectorFactory, LangDetectException, detect
@@ -21,6 +22,13 @@ class OptionalTranslator:
     def __init__(self, model_name: str = "Helsinki-NLP/opus-mt-mul-en"):
         self.model_name = model_name
         self._pipeline = None
+
+        if not self._translation_supported():
+            logger.info(
+                "Translation dependencies missing (transformers + torch/tensorflow/flax). Skipping model load."
+            )
+            return
+
         try:
             from transformers import pipeline
 
@@ -28,6 +36,11 @@ class OptionalTranslator:
             logger.info("Translation model %s loaded", model_name)
         except Exception as exc:  # pragma: no cover - optional dependency
             logger.warning("Translation pipeline unavailable (%s). Falling back to original text.", exc)
+
+    def _translation_supported(self) -> bool:
+        if not find_spec("transformers"):
+            return False
+        return any(find_spec(pkg) for pkg in ("torch", "tensorflow", "flax"))
 
     def translate(self, text: str) -> str:
         if not self._pipeline:
