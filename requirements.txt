@@ -5,3 +5,10 @@ matplotlib
 tensorflow
 scikit-learn
 yfinance
+requests
+redis
+kafka-python
+prefect
+langdetect
+transformers
+sentencepiece
