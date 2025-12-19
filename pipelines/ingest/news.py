@@ -21,6 +21,7 @@ class NewsCollector(BaseCollector):
         burst: int | None = None,
         params: dict | None = None,
     ):
+    def __init__(self, api_key: str, base_url: str, rate_limit_per_minute: int = 60, params: dict | None = None):
         default_params = {
             "language": "tr,en",
             "pageSize": 20,
@@ -35,6 +36,7 @@ class NewsCollector(BaseCollector):
             burst=burst,
             params=merged_params,
         )
+        super().__init__("news", api_key, base_url, rate_limit_per_minute, params=merged_params)
 
     def _fetch(self) -> Iterable[Document]:
         response = self.session.get(self.base_url, params=self.params, headers=self._headers(), timeout=30)

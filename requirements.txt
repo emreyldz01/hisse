@@ -3,6 +3,10 @@ pandas
 numpy
 matplotlib
 scikit-learn
+pandas
+numpy
+matplotlib
+scikit-learn
 yfinance
 requests
 redis
@@ -11,6 +15,3 @@ prefect
 langdetect
 transformers
 sentencepiece
-# TensorFlow sadece Streamlit uygulaması için gerekli.
-# 3.11 destekliyor, 3.12+ için pip bu satırı atlayacak.
-tensorflow==2.16.1; python_version < "3.12"
