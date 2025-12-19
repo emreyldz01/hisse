@@ -2,7 +2,11 @@ streamlit
 pandas
 numpy
 matplotlib
-tensorflow
+scikit-learn
+streamlit
+pandas
+numpy
+matplotlib
 scikit-learn
 yfinance
 requests
@@ -12,3 +16,4 @@ prefect
 langdetect
 transformers
 sentencepiece
+
