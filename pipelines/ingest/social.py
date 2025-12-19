@@ -30,11 +30,6 @@ class SocialCollector(BaseCollector):
             burst=burst,
             params=merged_params,
         )
-=======
-    def __init__(self, api_key: str, base_url: str, rate_limit_per_minute: int = 300, params: dict | None = None):
-        default_params = {"limit": 50, "order": "desc"}
-        merged_params = {**default_params, **(params or {})}
-        super().__init__("social", api_key, base_url, rate_limit_per_minute, params=merged_params)
 
     def _fetch(self) -> Iterable[Document]:
         response = self.session.get(self.base_url, params=self.params, headers=self._headers(), timeout=15)

@@ -30,11 +30,6 @@ class OnChainCollector(BaseCollector):
             burst=burst,
             params=merged_params,
         )
-=======
-    def __init__(self, api_key: str, base_url: str, rate_limit_per_minute: int = 120, params: dict | None = None):
-        default_params = {"window": "1h"}
-        merged_params = {**default_params, **(params or {})}
-        super().__init__("onchain", api_key, base_url, rate_limit_per_minute, params=merged_params)
 
     def _fetch(self) -> Iterable[Document]:
         response = self.session.get(self.base_url, params=self.params, headers=self._headers(), timeout=20)
