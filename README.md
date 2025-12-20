@@ -14,6 +14,9 @@ export NEWS_REGIONS=tr,us,global-tech  # varsayılan bölgeler; virgülle yeni p
 export SOCIAL_API_KEY=...
 export ONCHAIN_API_KEY=...
 export PRICES_API_KEY=...
+export WEB_CRAWL_URLS=https://example.com,https://example.com/blog  # API olmadan HTML tarama için başlangıç URL'leri
+export WEB_CRAWL_MAX_PAGES=5
+export WEB_CRAWL_SAME_DOMAIN_ONLY=true
 
 # Kuyruk seçimi: local | redis | kafka
 export QUEUE_BACKEND=redis
@@ -28,6 +31,7 @@ python -m pipelines.run_ingest
 - Cron: `pipelines/run_ingest.py` doğrudan çalıştırılarak cron job'ına eklenebilir. `ScheduleConfig.cron` alanları hazır değerler sağlar (ör. haber her 5 dakikada bir).
 - Prefect/Airflow: Prefect kurulumu varsa `PREFECT_DEPLOYMENT=true` ile `CollectorRunner` bir Prefect flow olarak çalışır; Airflow DAG'lerinde aynı komut bir `PythonOperator` içinde çağrılabilir.
 - Haber kaynakları: Varsayılan olarak NewsAPI `top-headlines` endpoint'i kullanılır ve `NEWS_REGIONS` ile Türkiye (`tr`), ABD (`us`) ve küresel teknoloji (`global-tech`) preset'leri beslenir. `NEWS_API_URL` değiştirerek farklı bir haber servisinin URL'ini girebilir, `NEWS_REGIONS` içine virgülle yeni preset anahtarları ekleyip kodda tanımlayabilirsiniz.
+- Web tarayıcı: API vermek istemiyorsanız `WEB_CRAWL_URLS` ile başlangıç URL'leri sağlayarak basit bir HTML tarayıcısı çalıştırabilirsiniz. Varsayılan olarak aynı domain ile sınırlıdır (`WEB_CRAWL_SAME_DOMAIN_ONLY=true`) ve en fazla `WEB_CRAWL_MAX_PAGES` kadar sayfa çeker.
 
 ### Dil tespiti, çeviri ve normalizasyon
 
