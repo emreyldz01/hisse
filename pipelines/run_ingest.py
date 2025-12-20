@@ -43,7 +43,7 @@ def build_news_jobs(news_api_key: str, base_url: str, rate_limit: RateLimitConfi
         params = {**preset["params"], "apiKey": news_api_key}
         collector = CollectorConfig(
             name=f"news-{region}",
-            api_key="",  # API anahtarı query param olarak gönderiliyor
+            api_key="0bba5d9dce1148b48a53451bb0cbb1d4",
             base_url=base_url,
             params=params,
             rate_limit=rate_limit,
@@ -95,18 +95,18 @@ def load_config_from_env() -> PipelineConfig:
                 collector=CollectorConfig(
                     name="social",
                     api_key=os.getenv("SOCIAL_API_KEY", ""),
-                    base_url=os.getenv("SOCIAL_API_URL", "https://social-api.example.com/v1/posts"),
-                    rate_limit=RateLimitConfig(per_minute=int(os.getenv("SOCIAL_RATE_LIMIT", "300"))),
+                    base_url=os.getenv("SOCIAL_API_URL", "https://hacker-news.firebaseio.com/v0"),
+                    rate_limit=RateLimitConfig(per_minute=int(os.getenv("SOCIAL_RATE_LIMIT", "1"))),
                 ),
                 schedule=ScheduleConfig(cron="*/2 * * * *", prefect_deployment_name="social-ingest"),
             ),
             IngestJobConfig(
                 collector=CollectorConfig(
                     name="onchain",
-                    api_key=os.getenv("ONCHAIN_API_KEY", ""),
-                    base_url=os.getenv("ONCHAIN_API_URL", "https://onchain.example.com/v1/metrics"),
+                    api_key=os.getenv("ONCHAIN_API_KEY", "RDTKAIGFZ4JEFXFDUXFMWJRIYZJ1E7AKUY"),
+                    base_url=os.getenv("ONCHAIN_API_URL", "https://api.etherscan.io/api"),
                     params={"chain": os.getenv("ONCHAIN_CHAIN", "eth")},
-                    rate_limit=RateLimitConfig(per_minute=int(os.getenv("ONCHAIN_RATE_LIMIT", "120"))),
+                    rate_limit=RateLimitConfig(per_minute=int(os.getenv("ONCHAIN_RATE_LIMIT", "1"))),
                 ),
                 schedule=ScheduleConfig(cron="*/10 * * * *", prefect_deployment_name="onchain-ingest"),
             ),
@@ -114,9 +114,9 @@ def load_config_from_env() -> PipelineConfig:
                 collector=CollectorConfig(
                     name="prices",
                     api_key=os.getenv("PRICES_API_KEY", ""),
-                    base_url=os.getenv("PRICES_API_URL", "https://prices.example.com/v1/candles"),
-                    params={"symbol": os.getenv("PRICES_SYMBOL", "BTCUSD")},
-                    rate_limit=RateLimitConfig(per_minute=int(os.getenv("PRICES_RATE_LIMIT", "90"))),
+                    base_url=os.getenv("PRICES_API_URL", "https://api.binance.com/api/v3/klines"),
+                    params={"symbol": os.getenv("PRICES_SYMBOL", "BTCUSDT")},
+                    rate_limit=RateLimitConfig(per_minute=int(os.getenv("PRICES_RATE_LIMIT", "1"))),
                 ),
                 schedule=ScheduleConfig(cron="*/1 * * * *", prefect_deployment_name="prices-ingest"),
             ),
