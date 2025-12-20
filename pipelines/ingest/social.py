@@ -57,16 +57,24 @@ class SocialCollector(BaseCollector):
             )
             return []
 
-        if not isinstance(payload, dict):
-            logger.warning("Skipping social fetch because response JSON is not an object: %s", type(payload).__name__)
-            return []
-
-        posts = payload.get("data", [])
-        if not isinstance(posts, list):
-            logger.warning("Skipping social fetch because 'data' is not a list in response JSON")
+        if isinstance(payload, dict):
+            posts = payload.get("data", [])
+            if isinstance(posts, dict):
+                posts = [posts]
+            if not isinstance(posts, list):
+                logger.warning("Skipping social fetch because 'data' is not a list in response JSON")
+                return []
+        elif isinstance(payload, list):
+            posts = payload
+        else:
+            logger.warning("Skipping social fetch because response JSON is neither an object nor a list: %s", type(payload).__name__)
             return []
 
         for post in posts:
+            if not isinstance(post, dict):
+                logger.debug("Skipping social post with unexpected type: %s", type(post).__name__)
+                continue
+
             yield Document(
                 text=post.get("text", ""),
                 source="social",
