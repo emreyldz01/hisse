@@ -7,6 +7,7 @@ from pipelines.ingest.news import NewsCollector
 from pipelines.ingest.onchain import OnChainCollector
 from pipelines.ingest.prices import PriceCollector
 from pipelines.ingest.social import SocialCollector
+from pipelines.ingest.web import WebCrawlerCollector
 from pipelines.orchestration import CollectorRunner, create_prefect_flow, create_queue_backend
 
 
@@ -122,6 +123,25 @@ def load_config_from_env() -> PipelineConfig:
         ]
     )
 
+    web_crawl_urls = [url.strip() for url in os.getenv("WEB_CRAWL_URLS", "").split(",") if url.strip()]
+    if web_crawl_urls:
+        jobs.append(
+            IngestJobConfig(
+                collector=CollectorConfig(
+                    name="web-crawl",
+                    api_key="",
+                    base_url=web_crawl_urls[0],
+                    params={
+                        "start_urls": web_crawl_urls,
+                        "max_pages": int(os.getenv("WEB_CRAWL_MAX_PAGES", "5")),
+                        "same_domain_only": os.getenv("WEB_CRAWL_SAME_DOMAIN_ONLY", "true").lower() == "true",
+                    },
+                    rate_limit=RateLimitConfig(per_minute=int(os.getenv("WEB_CRAWL_RATE_LIMIT", "30"))),
+                ),
+                schedule=ScheduleConfig(cron="*/30 * * * *", prefect_deployment_name="web-crawl-ingest"),
+            )
+        )
+
     return PipelineConfig(jobs=jobs, queue=queue_config)
 
 
@@ -144,6 +164,17 @@ def build_collectors(job_config: IngestJobConfig):
         return OnChainCollector(**kwargs)
     if name == "prices":
         return PriceCollector(**kwargs)
+    if name == "web-crawl":
+        params = collector_conf.params or {}
+        start_urls = params.get("start_urls", [])
+        return WebCrawlerCollector(
+            base_url=collector_conf.base_url,
+            start_urls=start_urls,
+            rate_limit_per_minute=rate_limit,
+            burst=collector_conf.rate_limit.burst,
+            max_pages=params.get("max_pages", 5),
+            same_domain_only=params.get("same_domain_only", True),
+        )
     raise ValueError(f"Unknown collector {name}")
 
 

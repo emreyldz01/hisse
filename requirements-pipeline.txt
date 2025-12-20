@@ -5,3 +5,4 @@ prefect
 langdetect
 transformers
 sentencepiece
+beautifulsoup4
