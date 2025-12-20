@@ -34,13 +34,26 @@ class SocialCollector(BaseCollector):
     def _fetch(self) -> Iterable[Document]:
         response = self.session.get(self.base_url, params=self.params, headers=self._headers(), timeout=15)
         response.raise_for_status()
+
+        content_type = (response.headers.get("Content-Type") or "").lower()
+        body_preview = response.text[:200].strip()
+        if "json" not in content_type and body_preview.lower().startswith("<!doctype html"):
+            logger.warning(
+                "Skipping social fetch because the endpoint returned HTML instead of JSON "
+                "(content-type=%s). This usually means the URL requires authentication/consent. "
+                "Response starts with: %s",
+                content_type or "unknown",
+                body_preview,
+            )
+            return []
+
         try:
             payload = response.json()
         except ValueError as exc:  # requests.exceptions.JSONDecodeError inherits ValueError
             logger.warning(
                 "Skipping social fetch because response body is not valid JSON (%s). Body starts with: %s",
                 exc,
-                response.text[:200],
+                body_preview,
             )
             return []
 
