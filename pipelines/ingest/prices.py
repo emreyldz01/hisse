@@ -35,7 +35,20 @@ class PriceCollector(BaseCollector):
         response = self.session.get(self.base_url, params=self.params, headers=self._headers(), timeout=10)
         response.raise_for_status()
         payload = response.json()
-        for candle in payload.get("candles", []):
+
+        if isinstance(payload, dict):
+            candles = payload.get("candles", [])
+        elif isinstance(payload, list):
+            candles = payload
+        else:
+            logger.warning("Unexpected payload type for prices collector: %s", type(payload).__name__)
+            return
+
+        for candle in candles:
+            if not isinstance(candle, dict):
+                logger.debug("Skipping candle with unexpected type: %s", type(candle).__name__)
+                continue
+
             text = f"{candle.get('symbol')} close={candle.get('close')} volume={candle.get('volume')}"
             yield Document(
                 text=text,
