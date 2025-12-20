@@ -10,6 +10,7 @@ hesaplama ai
 ```bash
 # ENV değişkenlerini doldurun
 export NEWS_API_KEY=...
+export NEWS_REGIONS=tr,us,global-tech  # varsayılan bölgeler; virgülle yeni preset ekleyin
 export SOCIAL_API_KEY=...
 export ONCHAIN_API_KEY=...
 export PRICES_API_KEY=...
@@ -26,6 +27,7 @@ python -m pipelines.run_ingest
 
 - Cron: `pipelines/run_ingest.py` doğrudan çalıştırılarak cron job'ına eklenebilir. `ScheduleConfig.cron` alanları hazır değerler sağlar (ör. haber her 5 dakikada bir).
 - Prefect/Airflow: Prefect kurulumu varsa `PREFECT_DEPLOYMENT=true` ile `CollectorRunner` bir Prefect flow olarak çalışır; Airflow DAG'lerinde aynı komut bir `PythonOperator` içinde çağrılabilir.
+- Haber kaynakları: Varsayılan olarak NewsAPI `top-headlines` endpoint'i kullanılır ve `NEWS_REGIONS` ile Türkiye (`tr`), ABD (`us`) ve küresel teknoloji (`global-tech`) preset'leri beslenir. `NEWS_API_URL` değiştirerek farklı bir haber servisinin URL'ini girebilir, `NEWS_REGIONS` içine virgülle yeni preset anahtarları ekleyip kodda tanımlayabilirsiniz.
 
 ### Dil tespiti, çeviri ve normalizasyon
 
@@ -41,4 +43,3 @@ python -m pipelines.run_ingest
   pip install -r requirements-pipeline.txt
   python -m pipelines.run_ingest
   ```
-
