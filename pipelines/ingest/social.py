@@ -34,8 +34,26 @@ class SocialCollector(BaseCollector):
     def _fetch(self) -> Iterable[Document]:
         response = self.session.get(self.base_url, params=self.params, headers=self._headers(), timeout=15)
         response.raise_for_status()
-        payload = response.json()
-        for post in payload.get("data", []):
+        try:
+            payload = response.json()
+        except ValueError as exc:  # requests.exceptions.JSONDecodeError inherits ValueError
+            logger.warning(
+                "Skipping social fetch because response body is not valid JSON (%s). Body starts with: %s",
+                exc,
+                response.text[:200],
+            )
+            return []
+
+        if not isinstance(payload, dict):
+            logger.warning("Skipping social fetch because response JSON is not an object: %s", type(payload).__name__)
+            return []
+
+        posts = payload.get("data", [])
+        if not isinstance(posts, list):
+            logger.warning("Skipping social fetch because 'data' is not a list in response JSON")
+            return []
+
+        for post in posts:
             yield Document(
                 text=post.get("text", ""),
                 source="social",
