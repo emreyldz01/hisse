@@ -31,7 +31,7 @@ NEWS_DEFAULT_PRESETS = {
 
 
 def build_news_jobs(news_api_key: str, base_url: str, rate_limit: RateLimitConfig) -> list[IngestJobConfig]:
-    regions_env = os.getenv("NEWS_REGIONS", "tr,us,global-tech")
+    regions_env = os.getenv("NEWS_REGIONS", "tr")
     selected_regions = [region.strip() for region in regions_env.split(",") if region.strip()]
 
     jobs: list[IngestJobConfig] = []
@@ -67,7 +67,7 @@ def load_config_from_env() -> PipelineConfig:
         kafka_topic=os.getenv("KAFKA_TOPIC", "ingest"),
     )
 
-    news_api_key = os.getenv("NEWS_API_KEY", "")
+    news_api_key = os.getenv("NEWS_API_KEY", "0bba5d9dce1148b48a53451bb0cbb1d4")
     news_base_url = os.getenv("NEWS_API_URL", "https://newsapi.org/v2/top-headlines")
     news_rate_limit = RateLimitConfig(per_minute=int(os.getenv("NEWS_RATE_LIMIT", "60")))
 

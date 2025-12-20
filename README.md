@@ -3,14 +3,14 @@ hesaplama ai
 
 ## Veri Toplama ve Ön İşleme Pipeline'ı
 
-`pipelines/` altında haber, sosyal medya, zincir üstü ve fiyat verileri için ayrı kolektörler eklenmiştir. Her kolektör kendi API anahtarı ve hız limitiyle yapılandırılır; mesajlar Redis/Kafka ya da yerel kuyruk üzerinden ayrıştırılmış olarak ilerler.
+`pipelines/` altında haber, sosyal medya, zincir üstü ve fiyat verileri için ayrı kolektörler eklenmiştir. Her kolektör kendi API anahtarı ve hız limitiyle yapılandırılır; mesajlar Redis/Kafka ya da yerel kuyruk üzerinden ayrıştırılmış olarak ilerler. Varsayılan olarak NewsAPI Türkiye iş/ekonomi başlıklarını çeken üretim anahtarı (0bba5d9dce1148b48a53451bb0cbb1d4) projeye entegredir; dilerseniz `.env` içinde değiştirebilirsiniz.
 
 ### Çalıştırma
 
 ```bash
 # ENV değişkenlerini doldurun
-export NEWS_API_KEY=...
-export NEWS_REGIONS=tr,us,global-tech  # varsayılan bölgeler; virgülle yeni preset ekleyin
+export NEWS_API_KEY=0bba5d9dce1148b48a53451bb0cbb1d4
+export NEWS_REGIONS=tr  # varsayılan bölge Türkiye; virgülle yeni preset ekleyin
 export SOCIAL_API_KEY=...
 export ONCHAIN_API_KEY=...
 export PRICES_API_KEY=...
@@ -30,7 +30,7 @@ python -m pipelines.run_ingest
 
 - Cron: `pipelines/run_ingest.py` doğrudan çalıştırılarak cron job'ına eklenebilir. `ScheduleConfig.cron` alanları hazır değerler sağlar (ör. haber her 5 dakikada bir).
 - Prefect/Airflow: Prefect kurulumu varsa `PREFECT_DEPLOYMENT=true` ile `CollectorRunner` bir Prefect flow olarak çalışır; Airflow DAG'lerinde aynı komut bir `PythonOperator` içinde çağrılabilir.
-- Haber kaynakları: Varsayılan olarak NewsAPI `top-headlines` endpoint'i kullanılır ve `NEWS_REGIONS` ile Türkiye (`tr`), ABD (`us`) ve küresel teknoloji (`global-tech`) preset'leri beslenir. `NEWS_API_URL` değiştirerek farklı bir haber servisinin URL'ini girebilir, `NEWS_REGIONS` içine virgülle yeni preset anahtarları ekleyip kodda tanımlayabilirsiniz.
+- Haber kaynakları: Varsayılan olarak NewsAPI `top-headlines` endpoint'i kullanılır; NEWS_API_KEY değeri projeye gömülü üretim anahtarıdır ve `NEWS_REGIONS` varsayılanı Türkiye'dir (`tr`). `NEWS_API_URL` değiştirerek farklı bir haber servisinin URL'ini girebilir, `NEWS_REGIONS` içine virgülle yeni preset anahtarları ekleyip kodda tanımlayabilirsiniz.
 - Web tarayıcı: API vermek istemiyorsanız `WEB_CRAWL_URLS` ile başlangıç URL'leri sağlayarak basit bir HTML tarayıcısı çalıştırabilirsiniz. Varsayılan olarak aynı domain ile sınırlıdır (`WEB_CRAWL_SAME_DOMAIN_ONLY=true`) ve en fazla `WEB_CRAWL_MAX_PAGES` kadar sayfa çeker.
 
 ### Dil tespiti, çeviri ve normalizasyon
